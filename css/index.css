@@ -1,14 +1,16 @@
 button {
     background-color: #gray; /* Green */
     border: none;
-    color: white;
+    color: #FF0000;
     padding: 15px 32px;
     text-align: center;
     text-decoration: none;
-    font-size: 40px;
+    font-size: 12vw;
     margin:auto;
     display:block;
     border-style: outset;
     border-color: ltgray;
     border-width: 7px;    
+    width: 50%;
+    height: 50%;
 }
