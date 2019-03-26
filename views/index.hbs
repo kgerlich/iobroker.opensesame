@@ -10,19 +10,24 @@
         </script>
     </head>
     <body>
-        <a href="{{ link }}">
+        <div>
             <button id="{{ id }}">
                 <p>OPEN</p>
             </button>
-        </a>
+        </div>
     </body>
     <script>
         $( document ).ready(function() {
             $( "#{{ id }}" ).click(function() {
                 $( "#{{ id }}" ).animate({
-                    opacity: 0.25
-                }, 5000, function() {
+                    opacity: 0.0
+                }, 1000, function() {
                     // Animation complete.
+                    $.get( "{{ link }}", function( data ) {
+                        $( "#{{ id }}" ).animate({
+                            opacity: 1.0
+                        }, 500);
+                    });
                 });
             });        
         });        
