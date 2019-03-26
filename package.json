@@ -1,0 +1,66 @@
+{
+  "_from": "https://github.com/kgerlich/iobroker.opensesame/tarball/master",
+  "_id": "iobroker.opensesame@0.0.1",
+  "_inBundle": false,
+  "_integrity": "sha512-ZZLpjtUZ9kvlXmFlrvZ2qPilh+IGxnVDmUuzJi3yX8dK+LxsZaC07lrPD7GSixkOJLn42lPZ1ms7iaXWSeZeUg==",
+  "_location": "/iobroker.opensesame",
+  "_phantomChildren": {},
+  "_requested": {
+    "type": "remote",
+    "raw": "https://github.com/kgerlich/iobroker.opensesame/tarball/master",
+    "rawSpec": "https://github.com/kgerlich/iobroker.opensesame/tarball/master",
+    "saveSpec": "https://github.com/kgerlich/iobroker.opensesame/tarball/master",
+    "fetchSpec": "https://github.com/kgerlich/iobroker.opensesame/tarball/master"
+  },
+  "_requiredBy": [
+    "#USER"
+  ],
+  "_resolved": "https://github.com/kgerlich/iobroker.opensesame/tarball/master",
+  "_shasum": "5b788a7004775230dbb1b6412f1fa3c765b1b789",
+  "_spec": "https://github.com/kgerlich/iobroker.opensesame/tarball/master",
+  "_where": "G:\\temp\\iobroker\\node_modules\\iobroker",
+  "author": {
+    "name": "Klaus Gerlicher",
+    "email": "klaus@klausgerlicher.de"
+  },
+  "bugs": {
+    "url": "https://github.com/kgerlich/iobroker.opensesame/issues"
+  },
+  "bundleDependencies": false,
+  "contributors": [
+    {
+      "name": "Klaus Gerlicher",
+      "email": "klaus@klausgerlicher.de"
+    }
+  ],
+  "dependencies": {
+    "express": "^4.16.4",
+    "hbs": "^4.0.3",
+    "pretty-ms": "^4.0.0"
+  },
+  "deprecated": false,
+  "description": "Adapter for opensesame",
+  "devDependencies": {
+    "chai": "^4.1.2",
+    "gulp": "^4.0.0",
+    "mocha": "^4.1.0"
+  },
+  "homepage": "https://github.com/kgerlich/iobroker.opensesame",
+  "keywords": [
+    "ioBroker",
+    "opensesame",
+    "Smart Home",
+    "home automation"
+  ],
+  "license": "MIT",
+  "main": "main.js",
+  "name": "iobroker.opensesame",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kgerlich/iobroker.opensesame.git"
+  },
+  "scripts": {
+    "test": "node node_modules/mocha/bin/mocha --exit"
+  },
+  "version": "0.0.1"
+}

@@ -1,0 +1,58 @@
+{
+    "common": {
+        "name": "opensesame",
+        "version": "0.0.1",
+        "news": {
+            "0.0.1": {
+                "en": "initial adapter",
+                "de": "Initiale Version"
+            }
+        },
+		"title": "opensesame Adapter",
+        "titleLang": {
+            "en": "opensesame",
+            "de": "opensesame"
+        },
+        "desc": {
+            "en": "Adapter for opensesame devices",
+            "de": "Adapter für opensesame Geräte"
+        },
+        "authors": [
+            "Klaus Gerlicher <klaus@klausgerlicher.de>"
+        ],
+        "docs": {
+            "en": "docs/en/admin.md",
+            "de": "docs/de/admin.md"
+        },
+        "platform": "Javascript/Node.js",
+        "mode": "daemon",
+        "icon": "opensesame.png",
+        "materialize": true,
+        "enabled": true,
+        "extIcon": "https://raw.githubusercontent.com/kgerlich/ioBroker.opensesame/master/admin/opensesame.png",
+        "keywords": ["opensesame", "door"],
+        "readme": "https://github.com/kgerlich/ioBroker.opensesame/blob/master/README.md",
+        "loglevel": "info",
+        "type": "misc-data",
+        "license": "MIT",
+        "messagebox": false
+    },
+    "native": {
+        "id": "",
+        "port": "8099"
+    },
+    "instanceObjects": [
+        {
+            "_id": "connected",
+            "type": "state",
+            "common": {
+                "name": "Info about connection to opensesame",
+                "type": "boolean",
+                "read":  true,
+                "write": false,
+				"role":  "indicator"
+            },
+            "native": {}
+        }
+    ]
+}
