@@ -73,7 +73,7 @@ function main() {
 
     app.set('view engine', 'hbs')
     app.set('views', path.join(__dirname, 'views'))
-    app.use(express.static('css'))
+    app.use(express.static(path.join(__dirname, 'css')))
 
     var port = adapter.config.port;
     app.get('/', (req, res) => 
