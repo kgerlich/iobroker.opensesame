@@ -13,8 +13,17 @@
     <body>
         <div>
             {{#each id}}
-                <button id="{{ this }}">
-                    <p>OPEN {{@index}}</p>
+                <button id="{{ this.id }}">
+                    {{#if this.name}}
+                        <p class="lg_text">{{ this.name }}</p>
+                    {{else}}
+                        <p class="lg_text">OPEN {{@index}}</p>
+                        <p class="sm_text">{{ this.id }}</p>
+                    {{/if}}
+                    <p class="sm_text">state = {{ this.val }}</p>
+                    {{#if this.name}}
+                        <p class="sm_text">{{ this.id }}</p>
+                    {{/if}}
                 </button>
                 <div></div>
             {{/each}}
@@ -23,13 +32,13 @@
     <script>
         $( document ).ready(function() {
             {{#each id}}
-                $( "#{{ this }}" ).click(function() {
-                    $( "#{{ this }}" ).animate({
+                $( "#{{ this.id }}" ).click(function() {
+                    $( "#{{ this.id }}" ).animate({
                         opacity: 0.0
                     }, 250, function() {
                         // Animation complete.
-                        $.get( "/open",  { id: "{{ this }}" } , function( data ) {
-                            $( "#{{ this }}" ).animate({
+                        $.get( "/open",  { id: "{{ this.id }}" } , function( data ) {
+                            $( "#{{ this.id }}" ).animate({
                                 opacity: 1.0
                             }, 100);
                         });

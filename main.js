@@ -39,6 +39,7 @@ const prettyMs = require('pretty-ms');
 const path = require('path');
 const express = require('express')
 const app = express()
+const util = require('util'); 
 
 // you have to call the adapter function and pass a options object
 // name has to be set and has to be equal to adapters folder name and main file name excluding extension
@@ -61,6 +62,15 @@ adapter.on('ready', function () {
     main();
 });
 
+adapter.on('stateChange', function (id, state) {
+    adapter.log.info('stateChange ' + id + ' ' + JSON.stringify(state));
+
+    // you can use the ack flag to detect if state is command(false) or status(true)
+    if (!state.ack) {
+        adapter.log.info('ack is not set!');
+    }
+});
+
 function main() {
 
     // The adapters config (in the instance object everything under the attribute "native") is accessible via
@@ -70,7 +80,7 @@ function main() {
 
     // in this all states changes inside the adapters namespace are subscribed
     adapter.subscribeStates('*');
-
+    
     app.set('view engine', 'hbs')
     app.set('views', path.join(__dirname, 'views'))
     app.use(express.static(path.join(__dirname, 'css')))
@@ -78,10 +88,17 @@ function main() {
     var port = adapter.config.port;
     let rid = [];
     for (let i= 0; i < adapter.config.id.length;i++ ) {
-        rid.push(adapter.config.id[i].replace(/[\.\-]/g, '_'));
+        rid.push({ id: adapter.config.id[i].replace(/[\.\-]/g, '_'), name: '', val: false});
+        // add initial state
+        adapter.getForeignObject(adapter.config.id[i], function (err, obj) {
+            let state = obj.common;
+            adapter.log.info(util.inspect(state) + ' ' + adapter.config.id[i] + ' is ' + state.val);
+            rid[i].val = state.val;
+            rid[i].name = state.name;
+        });        
+        adapter.subscribeForeignStates(adapter.config.id[i]);
     }
-    app.get('/', (req, res) => 
-    {
+    app.get('/', (req, res) => {
         res.render('index', { title: 'Open door', id: rid, link: '/open' });
     });
     app.get('/open', (req, res) => {

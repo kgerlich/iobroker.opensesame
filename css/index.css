@@ -1,17 +1,26 @@
+body {
+    background-image: linear-gradient(to right, rgba(128,128,128,0), rgba(128,128,100,1));
+    display: grid;
+    grid-template-columns: auto auto auto auto;
+}
+
 button {
-    background-color: #gray; /* Green */
-    border: none;
+    background-color: ltgray; 
     color: black;
     padding: 15px 32px;
     text-align: center;
-    text-decoration: none;
-    font-size: 12vw;
-    margin:auto;
-    display:block;
+    margin:20px auto;
     border-style: outset;
-    border-color: ltgray;
-    border-width: 3px;    
+    border-color: #fff;
+    border-width: 5px;    
     width: 50%;
     height: 50%;
-    text-shadow: 4px 4px gray;
+}
+
+.lg_text {
+    font-size: 30px;
+    text-shadow: 2px 2px gray;
+}
+.sm_text {
+    font-size: 12px;
 }
