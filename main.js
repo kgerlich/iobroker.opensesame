@@ -86,7 +86,7 @@ function main() {
     });
     app.get('/open', (req, res) => {
         if ('id' in req.query) {
-            console.log('open clicked for id = ' + req.query.id);
+            adapter.log.info('open clicked for id = ' + req.query.id);
             for (let i = 0; i <  adapter.config.id.length; i++) {
                 if (req.query.id == adapter.config.id[i].replace(/[\.\-]/g, '_'))
                     adapter.setForeignState( adapter.config.id, true);
@@ -94,5 +94,5 @@ function main() {
         }
         res.redirect('/');
     });
-    app.listen(port, () => console.log(`listening on port ${port}!`));
+    app.listen(port, () => adapter.log.info(`listening on port ${port}!`));
 } 
