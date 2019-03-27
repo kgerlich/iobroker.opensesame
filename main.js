@@ -88,8 +88,10 @@ function main() {
         if ('id' in req.query) {
             adapter.log.info('open clicked for id = ' + req.query.id);
             for (let i = 0; i <  adapter.config.id.length; i++) {
-                if (req.query.id == adapter.config.id[i].replace(/[\.\-]/g, '_'))
-                    adapter.setForeignState( adapter.config.id, true);
+                if (req.query.id == adapter.config.id[i].replace(/[\.\-]/g, '_')) {
+                    adapter.setForeignState( adapter.config.id[i], true);
+                    adapter.log.info('setForeignState for id = ' + adapter.config.id[i]);
+                }
             }
         }
         res.redirect('/');
