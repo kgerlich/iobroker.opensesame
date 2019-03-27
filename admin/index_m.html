@@ -28,7 +28,12 @@
         background: 50% no-repeat;
         border: 1px solid black;
         border-radius: 5px;
-    } </style>
+    } 
+    input[id^='id'] {
+        color: blue;
+        background-color: #E8E8E8!important;
+    }
+    </style>
 <!-- you have to define 2 functions in the global scope: -->
 <script type="text/javascript">
     // the function loadSettings has to exist ...
@@ -36,22 +41,35 @@
         // example: select elements with id=key and class=value and insert value
         if (!settings) return;
 
-        $('.value').each(function () {            
+        var t = $('#value_table');
+        $.each(settings.id, function(i, v) {
             var $key = $(this);
-            var id = $key.attr('id');
-            if ($key.attr('type') === 'checkbox') {
-		        // do not call onChange direct, because onChange could expect some arguments
-                $key.prop('checked', settings[id]).on('change', function() {
-                    onChange();
+            var row = $('<tr><td class="translate">ID' + i + '</td><td><input class="value" id="id' + i + '"/><button id="button_id' + i + '">DEL</button></td></tr>').appendTo(t);
+            $('#id' + i).val(v);
+            $('#id' + i).on('change', function() {
+                onChange();
+            }).on('keyup', function() {
+                onChange();
+            });
+            $('#button_id' + i).click(function() {
+                row.remove();
+                $('.value').each(function (i) {
+                    $(this).attr("id","id" + i);
+                    let e = $(this).parent().prev();
+                    e.text('ID' + i);
                 });
-            } else {
-		        // do not call onChange direct, because onChange could expect some arguments
-                $key.val(settings[id]).on('change', function() {
-                    onChange();
-                }).on('keyup', function() {
-                    onChange();
-                });
-            }
+                onChange();
+            });
+        });
+        $('#port').val(settings.port);
+        $('#add').click(function() {
+            let i = $('.value').length;
+            let row = $('<tr><td class="translate">ID' + i + '</td><td><input class="value" id="id' + i + '"/><button id="button_id' + i + '">DEL</button></td></tr>').appendTo(t);
+            $('#button_id' + i).click(function() {
+                row.remove();
+                onChange();
+            });
+            onChange();
         });
         onChange(false);
         M.updateTextFields();  // function Materialize.updateTextFields(); to reinitialize all the Materialize labels on the page if you are dynamically adding inputs.
@@ -62,13 +80,10 @@
     function save(callback) {
         // example: select elements with class=value and build settings object
         var obj = {};
-        $('.value').each(function () {
-            var $this = $(this);
-            if ($this.attr('type') === 'checkbox') {
-                obj[$this.attr('id')] = $this.prop('checked');
-            } else {
-                obj[$this.attr('id')] = $this.val();
-            }
+        obj.port = $('#port').val();
+        obj.id = [];
+        $('.value').each(function(i, v) {
+            obj.id[i] = $(v).val();
         });
         callback(obj);
         window.location.reload();
@@ -87,9 +102,11 @@
                 </div>
             </div>
             <div class="row">
-                <table>
-                    <tr><td class="translate">ID</td><td><input class="value" id="id"/></td></tr>
-                    <tr><td class="translate">PORT</td><td><input class="value" id="port"/></td></tr>
+                <p class="translate">PORT</p><input class="pvalue" id="port"/></br>
+            </div>
+            <div class="row">
+                <button id="add">ADD</button>
+                <table id='value_table'>
                 </table>
             </div>
         </div>

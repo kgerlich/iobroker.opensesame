@@ -76,14 +76,23 @@ function main() {
     app.use(express.static(path.join(__dirname, 'css')))
 
     var port = adapter.config.port;
+    let rid = [];
+    for (let i= 0; i < adapter.config.id.length;i++ ) {
+        rid.push(adapter.config.id[i].replace(/[\.\-]/g, '_'));
+    }
     app.get('/', (req, res) => 
     {
-        res.render('index', { title: 'Open door', id: adapter.config.id.replace(/[\.\-]/g, '_'), link: '/open' });
+        res.render('index', { title: 'Open door', id: rid, link: '/open' });
     });
     app.get('/open', (req, res) => {
-        console.log('open clicked');
-        adapter.setForeignState( adapter.config.id, true);
+        if ('id' in req.query) {
+            console.log('open clicked for id = ' + req.query.id);
+            for (let i = 0; i <  adapter.config.id.length; i++) {
+                if (req.query.id == adapter.config.id[i].replace(/[\.\-]/g, '_'))
+                    adapter.setForeignState( adapter.config.id, true);
+            }
+        }
         res.redirect('/');
     });
-    app.listen(port, () => console.log(`Example app listening on port ${port}!`));
+    app.listen(port, () => console.log(`listening on port ${port}!`));
 } 

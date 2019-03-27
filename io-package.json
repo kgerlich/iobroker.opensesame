@@ -38,7 +38,7 @@
         "messagebox": false
     },
     "native": {
-        "id": "",
+        "id": [],
         "port": "8099"
     },
     "instanceObjects": [

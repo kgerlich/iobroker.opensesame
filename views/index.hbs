@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html>
     <head>
         <title>
@@ -11,25 +12,30 @@
     </head>
     <body>
         <div>
-            <button id="{{ id }}">
-                <p>OPEN</p>
-            </button>
+            {{#each id}}
+                <button id="{{ this }}">
+                    <p>OPEN {{@index}}</p>
+                </button>
+                <div></div>
+            {{/each}}
         </div>
     </body>
     <script>
         $( document ).ready(function() {
-            $( "#{{ id }}" ).click(function() {
-                $( "#{{ id }}" ).animate({
-                    opacity: 0.0
-                }, 1000, function() {
-                    // Animation complete.
-                    $.get( "{{ link }}", function( data ) {
-                        $( "#{{ id }}" ).animate({
-                            opacity: 1.0
-                        }, 500);
+            {{#each id}}
+                $( "#{{ this }}" ).click(function() {
+                    $( "#{{ this }}" ).animate({
+                        opacity: 0.0
+                    }, 250, function() {
+                        // Animation complete.
+                        $.get( "/open",  { id: "{{ this }}" } , function( data ) {
+                            $( "#{{ this }}" ).animate({
+                                opacity: 1.0
+                            }, 100);
+                        });
                     });
-                });
-            });        
+                });        
+            {{/each}}
         });        
     </script>
 </html>
