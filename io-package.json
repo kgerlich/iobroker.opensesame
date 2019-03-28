@@ -35,7 +35,8 @@
         "loglevel": "info",
         "type": "misc-data",
         "license": "MIT",
-        "messagebox": false
+        "messagebox": false,
+        "localLink": "%opensesame_protocol%://%ip%:%opensesame_port%/"
     },
     "native": {
         "id": [],
