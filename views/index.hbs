@@ -5,46 +5,65 @@
             {{ title }}
         </title>
         <link rel="stylesheet" type="text/css" href="index.css">
-        <script src="http://code.jquery.com/jquery-3.3.1.min.js"
-            integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
-            crossorigin="anonymous">
+        <script src="jquery-3.3.1.min.js">
         </script>
+        <script src="vue.js">
+        </script>        
     </head>
     <body>
-        <div>
-            {{#each id}}
-                <button id="{{ this.id }}">
-                    {{#if this.name}}
-                        <p class="lg_text">{{ this.name }}</p>
-                    {{else}}
-                        <p class="lg_text">OPEN {{@index}}</p>
-                        <p class="sm_text">{{ this.id }}</p>
-                    {{/if}}
-                    <p class="sm_text">state = {{ this.val }}</p>
-                    {{#if this.name}}
-                        <p class="sm_text">{{ this.id }}</p>
-                    {{/if}}
-                </button>
-                <div></div>
-            {{/each}}
+        <div id="buttons">
+            <open-sesame-button v-for="r in rid" v-bind:device="r" :key="r.id"></open-sesame-button>
         </div>
     </body>
     <script>
-        $( document ).ready(function() {
-            {{#each id}}
-                $( "#{{ this.id }}" ).click(function() {
-                    $( "#{{ this.id }}" ).animate({
+        // Define a new component called button-counter
+        Vue.component('open-sesame-button', {
+            props: ['device'],
+            methods: {
+                clicked_button: function(event) {
+                    let targetId = event.currentTarget.id;
+                    $( "#" + targetId).animate({
                         opacity: 0.0
                     }, 250, function() {
                         // Animation complete.
-                        $.get( "/open",  { id: "{{ this.id }}" } , function( data ) {
-                            $( "#{{ this.id }}" ).animate({
+                        $.get( "/open",  { id: targetId } , function( data ) {
+                            $( "#" + targetId).animate({
                                 opacity: 1.0
                             }, 100);
                         });
                     });
-                });        
-            {{/each}}
-        });        
+                }
+            },
+            template: '<button :id="device.id" @click="clicked_button($event)">          \
+                        <p v-if="device.name" class="lg_text">[[ device.name ]]</p>      \
+                        <p v-if="!device.name"class="lg_text">OPEN [[device.index]]</p>  \
+                        <p v-if="!device.name" class="sm_text">[[ device.id ]]</p>       \
+                        <p class="sm_text">state = [[ device.val ]]</p>                  \
+                        <p v-if="device.name" class="sm_text">[[ device.id ]]</p>        \
+                    </button>',
+            delimiters: ["[[","]]"]
+        });
+        
+        let app = new Vue({
+            el: '#buttons',
+            data: {
+                rid: []
+            },
+            delimiters: ["[[","]]"]
+        })              
+
+        $( document ).ready(function() {
+            // retrieve data from server
+            function get_data() {
+                $.get(
+                    "/get",
+                    function(data) {
+                        app.rid = data;
+                        setTimeout(get_data, 5*1000);
+                    }
+                );
+            }
+            get_data();
+        });  
     </script>
 </html>

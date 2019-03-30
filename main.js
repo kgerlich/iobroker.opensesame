@@ -84,11 +84,12 @@ function main() {
     app.set('view engine', 'hbs')
     app.set('views', path.join(__dirname, 'views'))
     app.use(express.static(path.join(__dirname, 'css')))
+    app.use(express.static(path.join(__dirname, 'js')))
 
     var port = adapter.config.port;
     let rid = [];
     for (let i= 0; i < adapter.config.id.length;i++ ) {
-        rid.push({ id: adapter.config.id[i].replace(/[\.\-]/g, '_'), name: '', val: false});
+        rid.push({ index: i, id: adapter.config.id[i].replace(/[\.\-]/g, '_'), name: '', val: false});
         // add initial state
         adapter.getForeignObject(adapter.config.id[i], function (err, obj) {
             let state = obj.common;
@@ -98,9 +99,11 @@ function main() {
         });        
         adapter.subscribeForeignStates(adapter.config.id[i]);
     }
+
     app.get('/', (req, res) => {
         res.render('index', { title: 'Open door', id: rid, link: '/open' });
     });
+
     app.get('/open', (req, res) => {
         if ('id' in req.query) {
             adapter.log.info('open clicked for id = ' + req.query.id);
@@ -112,6 +115,28 @@ function main() {
             }
         }
         res.redirect('/');
+    });
+
+    app.get('/get', (req, res) => {
+        let promises = [];
+        for (let i = 0; i < rid.length; i++) {
+            promises[i] = new Promise(function(resolve, reject) {
+                adapter.getForeignObject(adapter.config.id[i], function (err, obj) {
+                    if (err || !obj) {
+                        reject();
+                        return;
+                    }
+                    let state = obj.common;
+                    rid[i].val = state.val;
+                    resolve(rid[i]);
+                });        
+            });
+        }
+
+        Promise.all(promises).then(function(values) {
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(values));            
+        });
     });
     app.listen(port, () => adapter.log.info(`listening on port ${port}!`));
 } 
