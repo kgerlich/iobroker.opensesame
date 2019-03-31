@@ -35,7 +35,8 @@
   ],
   "dependencies": {
     "express": "^4.16.4",
-    "pretty-ms": "^4.0.0"
+    "pretty-ms": "^4.0.0",
+    "vue-simple-spinner": "^1.2.8"
   },
   "deprecated": false,
   "description": "Adapter for opensesame",

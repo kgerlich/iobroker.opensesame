@@ -5,10 +5,9 @@
             Index
         </title>
         <link rel="stylesheet" type="text/css" href="index.css">
-        <script src="jquery-3.3.1.min.js">
-        </script>
-        <script src="vue.js">
-        </script>        
+        <script src="jquery-3.3.1.min.js"></script>
+        <script src="vue.js"></script>        
+        <script src="vue-simple-spinner.min.js"></script>        
     </head>
     <body>
         <div id="buttons">
@@ -21,9 +20,10 @@
             props: ['device'],
             methods: {
                 clicked_button: function(event) {
+                    this.device.updating = true;
                     let targetId = event.currentTarget.id;
                     $( "#" + targetId).animate({
-                        opacity: 0.0
+                        opacity: 0.1
                     }, 250, function() {
                         // Animation complete.
                         $.get( "/open",  { id: targetId } , function( data ) {
@@ -35,6 +35,7 @@
                 }
             },
             template: '<button :id="device.id" @click="clicked_button($event)">          \
+                        <vue-simple-spinner v-if="device.updating"></vue-simple-spinner> \
                         <p v-if="device.name" class="lg_text">{{ device.name }}</p>      \
                         <p v-if="!device.name"class="lg_text">OPEN {{device.index}}</p>  \
                         <p v-if="!device.name" class="sm_text">{{ device.id }}</p>       \

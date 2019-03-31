@@ -39,7 +39,7 @@ const prettyMs = require('pretty-ms');
 const path = require('path');
 const express = require('express')
 const app = express()
-const util = require('util'); 
+const util = require('util');
 
 // you have to call the adapter function and pass a options object
 // name has to be set and has to be equal to adapters folder name and main file name excluding extension
@@ -80,7 +80,7 @@ function main() {
 
     // in this all states changes inside the adapters namespace are subscribed
     adapter.subscribeStates('*');
-    
+
     app.use(express.static(path.join(__dirname, 'views')))
     app.use(express.static(path.join(__dirname, 'css')))
     app.use(express.static(path.join(__dirname, 'js')))
@@ -88,14 +88,14 @@ function main() {
     var port = adapter.config.port;
     let rid = [];
     for (let i= 0; i < adapter.config.id.length;i++ ) {
-        rid.push({ index: i, id: adapter.config.id[i].replace(/[\.\-]/g, '_'), name: '', val: false});
+        rid.push({ index: i, updating: false, id: adapter.config.id[i].replace(/[\.\-]/g, '_'), name: '', val: false});
         // add initial state
         adapter.getForeignObject(adapter.config.id[i], function (err, obj) {
             let state = obj.common;
             adapter.log.info(util.inspect(state) + ' ' + adapter.config.id[i] + ' is ' + state.val);
             rid[i].val = state.val;
             rid[i].name = state.name;
-        });        
+        });
         adapter.subscribeForeignStates(adapter.config.id[i]);
     }
 
@@ -108,12 +108,20 @@ function main() {
             adapter.log.info('open clicked for id = ' + req.query.id);
             for (let i = 0; i <  adapter.config.id.length; i++) {
                 if (req.query.id == adapter.config.id[i].replace(/[\.\-]/g, '_')) {
-                    adapter.setForeignState( adapter.config.id[i], true);
-                    adapter.log.info('setForeignState for id = ' + adapter.config.id[i]);
+                    adapter.setForeignState( adapter.config.id[i], true, function(err, id) {
+                        if (err) {
+                            adapter.log.info('err: setForeignState for id = ' + adapter.config.id[i]);
+                        }
+                        adapter.log.info('setForeignState for id = ' + adapter.config.id[i]);
+                        rid[i].val = true;
+                        res.setHeader('Content-Type', 'application/json');
+                        res.end(JSON.stringify(rid));
+                    });
+                    break;
                 }
             }
         }
-        res.redirect('/');
+        // res.redirect('/');
     });
 
     app.get('/get', (req, res) => {
@@ -128,14 +136,14 @@ function main() {
                     let state = obj.common;
                     rid[i].val = state.val;
                     resolve(rid[i]);
-                });        
+                });
             });
         }
 
         Promise.all(promises).then(function(values) {
             res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify(values));            
+            res.end(JSON.stringify(values));
         });
     });
     app.listen(port, () => adapter.log.info(`listening on port ${port}!`));
-} 
+}
