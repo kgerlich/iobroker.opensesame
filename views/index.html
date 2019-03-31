@@ -2,7 +2,7 @@
 <html>
     <head>
         <title>
-            {{ title }}
+            Index
         </title>
         <link rel="stylesheet" type="text/css" href="index.css">
         <script src="jquery-3.3.1.min.js">
@@ -35,13 +35,12 @@
                 }
             },
             template: '<button :id="device.id" @click="clicked_button($event)">          \
-                        <p v-if="device.name" class="lg_text">[[ device.name ]]</p>      \
-                        <p v-if="!device.name"class="lg_text">OPEN [[device.index]]</p>  \
-                        <p v-if="!device.name" class="sm_text">[[ device.id ]]</p>       \
-                        <p class="sm_text">state = [[ device.val ]]</p>                  \
-                        <p v-if="device.name" class="sm_text">[[ device.id ]]</p>        \
+                        <p v-if="device.name" class="lg_text">{{ device.name }}</p>      \
+                        <p v-if="!device.name"class="lg_text">OPEN {{device.index}}</p>  \
+                        <p v-if="!device.name" class="sm_text">{{ device.id }}</p>       \
+                        <p class="sm_text">state = {{ device.val }}</p>                  \
+                        <p v-if="device.name" class="sm_text">{{ device.id }}</p>        \
                     </button>',
-            delimiters: ["[[","]]"]
         });
         
         let app = new Vue({
@@ -49,7 +48,6 @@
             data: {
                 rid: []
             },
-            delimiters: ["[[","]]"]
         })              
 
         $( document ).ready(function() {

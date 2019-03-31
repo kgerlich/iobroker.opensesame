@@ -35,7 +35,6 @@
   ],
   "dependencies": {
     "express": "^4.16.4",
-    "hbs": "^4.0.3",
     "pretty-ms": "^4.0.0"
   },
   "deprecated": false,

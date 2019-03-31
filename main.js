@@ -81,8 +81,7 @@ function main() {
     // in this all states changes inside the adapters namespace are subscribed
     adapter.subscribeStates('*');
     
-    app.set('view engine', 'hbs')
-    app.set('views', path.join(__dirname, 'views'))
+    app.use(express.static(path.join(__dirname, 'views')))
     app.use(express.static(path.join(__dirname, 'css')))
     app.use(express.static(path.join(__dirname, 'js')))
 
@@ -101,7 +100,7 @@ function main() {
     }
 
     app.get('/', (req, res) => {
-        res.render('index', { title: 'Open door', id: rid, link: '/open' });
+        res.sendFile(path.join(__dirname + '/views/index.html'));
     });
 
     app.get('/open', (req, res) => {
