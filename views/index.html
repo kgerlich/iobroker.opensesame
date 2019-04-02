@@ -32,6 +32,9 @@
                             }, 100);
                         });
                     });
+                },
+                isNumber: function() {
+                    return this.device.type === 'number';
                 }
             },
             template: '<button :id="device.id" @click="clicked_button($event)">          \
@@ -39,7 +42,8 @@
                         <p v-if="device.name" class="lg_text">{{ device.name }}</p>      \
                         <p v-if="!device.name"class="lg_text">OPEN {{device.index}}</p>  \
                         <p v-if="!device.name" class="sm_text">{{ device.id }}</p>       \
-                        <p class="sm_text">state = {{ device.val }}</p>                  \
+                        <p class="sm_text" v-if="isNumber()" >number {{ device.val }}</p>                  \
+                        <p class="sm_text" v-else>bool {{ device.val ? "true" : "false" }}</p>                  \
                         <p v-if="device.name" class="sm_text">{{ device.id }}</p>        \
                     </button>',
         });

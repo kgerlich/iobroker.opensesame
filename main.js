@@ -95,6 +95,9 @@ function main() {
             adapter.log.info(util.inspect(state) + ' ' + adapter.config.id[i] + ' is ' + state.val);
             rid[i].val = state.val;
             rid[i].name = state.name;
+            rid[i].type = state.type;
+            rid[i].role = state.role;
+
         });
         adapter.subscribeForeignStates(adapter.config.id[i]);
     }
