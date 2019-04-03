@@ -85,10 +85,27 @@ function main() {
     app.use(express.static(path.join(__dirname, 'css')))
     app.use(express.static(path.join(__dirname, 'js')))
 
+    const roles = ['level.switch', 'indicator.switch', 'indicator.level'];
+    let all_rid = [];
+    let idx = 0;
+    adapter.getForeignObjects('*', 'state', (err, objs) => {
+        for (let key in objs) {
+            let r = /^[a-zA-Z0-9]+\.[0-9]+/.exec(key);
+            if (r) {
+                if (-1 != roles.indexOf(objs[key].common.role)) {
+                    console.log(key + ' ' + objs[key].name);
+                    let state = objs[key].common;
+                    all_rid.push({ index: idx, updating: false, real_id: key, id: key.replace(/[\.\-]/g, '_'), name: state.name, val: state.val, type: state.type, role: state.role});
+                    idx++;
+                }
+            }
+        }
+    });
+
     var port = adapter.config.port;
     let rid = [];
     for (let i= 0; i < adapter.config.id.length;i++ ) {
-        rid.push({ index: i, updating: false, id: adapter.config.id[i].replace(/[\.\-]/g, '_'), name: '', val: false});
+        rid.push({ index: i, updating: false, real_id:  adapter.config.id[i], id: adapter.config.id[i].replace(/[\.\-]/g, '_'), name: '', val: false});
         // add initial state
         adapter.getForeignObject(adapter.config.id[i], function (err, obj) {
             let state = obj.common;
@@ -128,17 +145,22 @@ function main() {
     });
 
     app.get('/get', (req, res) => {
+        let l = rid;
+        if ('all' in req.query) {
+            l = all_rid;
+        }
+
         let promises = [];
-        for (let i = 0; i < rid.length; i++) {
+        for (let i = 0; i < l.length; i++) {
             promises[i] = new Promise(function(resolve, reject) {
-                adapter.getForeignObject(adapter.config.id[i], function (err, obj) {
+                adapter.getForeignObject(l[i].real_id, function (err, obj) {
                     if (err || !obj) {
                         reject();
                         return;
                     }
                     let state = obj.common;
-                    rid[i].val = state.val;
-                    resolve(rid[i]);
+                    l[i].val = state.val;
+                    resolve(l[i]);
                 });
             });
         }

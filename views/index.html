@@ -11,7 +11,15 @@
     </head>
     <body>
         <div id="buttons">
-            <open-sesame-button v-for="r in rid" v-bind:device="r" :key="r.id"></open-sesame-button>
+            <div>
+                <open-sesame-button v-for="r in rid" v-bind:device="r" :key="r.id"></open-sesame-button>
+            </div>
+            <div class="horzLine">
+            </div>
+            <div>
+                <input class="lg_checkbox" type="checkbox" id="checkbox" v-model="all">
+                <label for="checkbox">{{ all ? "show only selected states" : "show all states" }}</label>
+            </div>
         </div>
     </body>
     <script>
@@ -47,25 +55,37 @@
                         <p v-if="device.name" class="sm_text">{{ device.id }}</p>        \
                     </button>',
         });
+
+        // retrieve data from server
+        function get_data() {
+            options = {}
+            if (app.all) {
+                options = { all: 1 };
+            }
+            $.get(
+                "/get",
+                options,
+                function(data) {
+                    app.rid = data;
+                    setTimeout(get_data, 5*1000);
+                }
+            );
+        }
         
         let app = new Vue({
             el: '#buttons',
             data: {
-                rid: []
+                rid: [],
+                all: false
             },
-        })              
+            watch: {
+                all: function(old_value, new_value) {
+                    get_data();
+                }
+            }
+        })
 
         $( document ).ready(function() {
-            // retrieve data from server
-            function get_data() {
-                $.get(
-                    "/get",
-                    function(data) {
-                        app.rid = data;
-                        setTimeout(get_data, 5*1000);
-                    }
-                );
-            }
             get_data();
         });  
     </script>
