@@ -33,6 +33,10 @@
         color: blue;
         background-color: #E8E8E8!important;
     }
+    input[id^='name_id'] {
+        color: blue;
+        background-color: #E8E8E8!important;
+    }
     </style>
 <!-- you have to define 2 functions in the global scope: -->
 <script type="text/javascript">
@@ -43,10 +47,16 @@
 
         var t = $('#value_table');
         $.each(settings.id, function(i, v) {
-            var $key = $(this);
-            var row = $('<tr><td class="translate">ID' + i + '</td><td><input class="value" id="id' + i + '"/><button id="button_id' + i + '">DEL</button></td></tr>').appendTo(t);
-            $('#id' + i).val(v);
+            let $key = $(this);
+            let row = $('<tr><td class="translate">ID' + i + '<button id="button_id' + i + '">DEL</button></td><td><input class="value" id="id' + i + '"/></td><td><input class="name_value" id="name_id' + i + '"/></td></tr>').appendTo(t);
+            $('#id' + i).val(v.id);
+            $('#name_id' + i).val(v.name);
             $('#id' + i).on('change', function() {
+                onChange();
+            }).on('keyup', function() {
+                onChange();
+            });
+            $('#name_id' + i).on('change', function() {
                 onChange();
             }).on('keyup', function() {
                 onChange();
@@ -64,7 +74,7 @@
         $('#port').val(settings.port);
         $('#add').click(function() {
             let i = $('.value').length;
-            let row = $('<tr><td class="translate">ID' + i + '</td><td><input class="value" id="id' + i + '"/><button id="button_id' + i + '">DEL</button></td></tr>').appendTo(t);
+            let row = $('<tr><td class="translate">ID' + i + '<button id="button_id' + i + '">DEL</button></td><td><input class="value" id="id' + i + '"/></td><td><input class="name_value" id="name_id' + i + '"/></td></tr>').appendTo(t);
             $('#button_id' + i).click(function() {
                 row.remove();
                 onChange();
@@ -83,7 +93,11 @@
         obj.port = $('#port').val();
         obj.id = [];
         $('.value').each(function(i, v) {
-            obj.id[i] = $(v).val();
+            obj.id[i] = {}
+            obj.id[i].id = $(v).val();
+        });
+        $('.name_value').each(function(i, v) {
+            obj.id[i].name = $(v).val();
         });
         callback(obj);
         window.location.reload();

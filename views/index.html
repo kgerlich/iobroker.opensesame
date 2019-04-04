@@ -12,7 +12,7 @@
     <body>
         <div id="buttons">
             <div>
-                <open-sesame-button v-for="r in rid" v-bind:device="r" :key="r.id"></open-sesame-button>
+                <open-sesame-button v-for="r in rid" v-bind:show_info="show_info" v-bind:device="r" :key="r.id"></open-sesame-button>
             </div>
             <div class="horzLine">
             </div>
@@ -20,12 +20,16 @@
                 <input class="lg_checkbox" type="checkbox" id="checkbox" v-model="all">
                 <label for="checkbox">{{ all ? "show only selected states" : "show all states" }}</label>
             </div>
+            <div>
+                <input class="lg_checkbox" type="checkbox" id="checkbox_info" v-model="show_info">
+                <label for="checkbox">{{ "show extra information" }}</label>
+            </div>
         </div>
     </body>
     <script>
         // Define a new component called button-counter
         Vue.component('open-sesame-button', {
-            props: ['device'],
+            props: ['device', 'show_info'],
             methods: {
                 clicked_button: function(event) {
                     this.device.updating = true;
@@ -50,9 +54,11 @@
                         <p v-if="device.name" class="lg_text">{{ device.name }}</p>      \
                         <p v-if="!device.name"class="lg_text">OPEN {{device.index}}</p>  \
                         <p v-if="!device.name" class="sm_text">{{ device.id }}</p>       \
-                        <p class="sm_text" v-if="isNumber()" >number {{ device.val }}</p>                  \
-                        <p class="sm_text" v-else>bool {{ device.val ? "true" : "false" }}</p>                  \
-                        <p v-if="device.name" class="sm_text">{{ device.id }}</p>        \
+                        <div v-if="show_info">                                           \
+                            <p class="sm_text" v-if="isNumber()" >number {{ device.val }}</p>      \
+                            <p class="sm_text" v-else>bool {{ device.val ? "true" : "false" }}</p> \
+                            <p v-if="device.name" class="sm_text">{{ device.id }}</p>        \
+                        </div>                                                           \
                     </button>',
         });
 
@@ -76,10 +82,14 @@
             el: '#buttons',
             data: {
                 rid: [],
-                all: false
+                all: false,
+                show_info: false
             },
             watch: {
                 all: function(old_value, new_value) {
+                    get_data();
+                },
+                show_info: function(old_value, new_value) {
                     get_data();
                 }
             }

@@ -75,7 +75,6 @@ function main() {
 
     // The adapters config (in the instance object everything under the attribute "native") is accessible via
     // adapter.config:
-    adapter.log.info('ID to show: ' + adapter.config.id);
     adapter.log.info('port of web server: ' + adapter.config.port);
 
     // in this all states changes inside the adapters namespace are subscribed
@@ -107,18 +106,18 @@ function main() {
     var port = adapter.config.port;
     let rid = [];
     for (let i= 0; i < adapter.config.id.length;i++ ) {
-        rid.push({ index: i, updating: false, real_id:  adapter.config.id[i], id: adapter.config.id[i].replace(/[\.\-]/g, '_'), name: '', val: false});
+        rid.push({ index: i, updating: false, real_id:  adapter.config.id[i].id, id: adapter.config.id[i].id.replace(/[\.\-]/g, '_'), name: adapter.config.id[i].name, val: false});
         // add initial state
-        adapter.getForeignObject(adapter.config.id[i], function (err, obj) {
+        adapter.getForeignObject(adapter.config.id[i].id, function (err, obj) {
             let state = obj.common;
-            adapter.log.info(util.inspect(state) + ' ' + adapter.config.id[i] + ' is ' + state.val);
+            adapter.log.info(util.inspect(state) + ' ' + adapter.config.id[i].id + ' is ' + state.val);
             rid[i].val = state.val;
-            rid[i].name = state.name;
+            rid[i].real_name = state.name;
             rid[i].type = state.type;
             rid[i].role = state.role;
 
         });
-        adapter.subscribeForeignStates(adapter.config.id[i]);
+        adapter.subscribeForeignStates(adapter.config.id[i].id);
     }
 
     app.get('/', (req, res) => {
@@ -129,12 +128,12 @@ function main() {
         if ('id' in req.query) {
             adapter.log.info('open clicked for id = ' + req.query.id);
             for (let i = 0; i <  adapter.config.id.length; i++) {
-                if (req.query.id == adapter.config.id[i].replace(/[\.\-]/g, '_')) {
-                    adapter.setForeignState( adapter.config.id[i], true, function(err, id) {
+                if (req.query.id == adapter.config.id[i].id.replace(/[\.\-]/g, '_')) {
+                    adapter.setForeignState( adapter.config.id[i].id, true, function(err, id) {
                         if (err) {
-                            adapter.log.info('err: setForeignState for id = ' + adapter.config.id[i]);
+                            adapter.log.info('err: setForeignState for id = ' + adapter.config.id[i].id);
                         }
-                        adapter.log.info('setForeignState for id = ' + adapter.config.id[i]);
+                        adapter.log.info('setForeignState for id = ' + adapter.config.id[i].id);
                         rid[i].val = true;
                         res.setHeader('Content-Type', 'application/json');
                         res.end(JSON.stringify(rid));
