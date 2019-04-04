@@ -85,15 +85,17 @@ function main() {
     app.use(express.static(path.join(__dirname, 'css')))
     app.use(express.static(path.join(__dirname, 'js')))
 
-    const roles = ['level.switch', 'indicator.switch', 'indicator.level'];
+    const roles = ['switch', 'level.blind', 'indicator.switch', 'indicator.level'];
     let all_rid = [];
     let idx = 0;
     adapter.getForeignObjects('*', 'state', (err, objs) => {
+        adapter.log.debug(Object.keys(objs).length + ' foreign states.');
         for (let key in objs) {
             let r = /^[a-zA-Z0-9]+\.[0-9]+/.exec(key);
             if (r) {
                 if (-1 != roles.indexOf(objs[key].common.role)) {
                     console.log(key + ' ' + objs[key].name);
+                    adapter.log.debug(key + ' ' + objs[key].name);
                     let state = objs[key].common;
                     all_rid.push({ index: idx, updating: false, real_id: key, id: key.replace(/[\.\-]/g, '_'), name: state.name, val: state.val, type: state.type, role: state.role});
                     idx++;
