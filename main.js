@@ -34,7 +34,7 @@
 'use strict';
 
 // you have to require the utils module and call adapter function
-const utils = require(__dirname + '/lib/utils'); // Get common adapter utils
+const utils = require("@iobroker/adapter-core");
 const prettyMs = require('pretty-ms');
 const path = require('path');
 const express = require('express')
