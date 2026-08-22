@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "opensesame",
-        "version": "0.0.1",
+        "version": "0.1.0",
         "news": {
+            "0.1.0": {
+                "en": "logic-driven buttons (conditions + multi-action + script), live updates, modern GUI",
+                "de": "logikgesteuerte Buttons (Bedingungen + Mehrfachaktionen + Skript), Live-Updates, moderne Oberfläche"
+            },
             "0.0.1": {
                 "en": "initial adapter",
                 "de": "Initiale Version"
@@ -39,7 +43,7 @@
         "localLink": "%opensesame_protocol%://%ip%:%opensesame_port%/"
     },
     "native": {
-        "id": [],
+        "buttons": [],
         "port": "8099"
     },
     "instanceObjects": [

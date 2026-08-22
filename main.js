@@ -2,53 +2,31 @@
  *
  * opensesame adapter
  *
- *
- *  file io-package.json comments:
- *
- *  {
- *      "common": {
- *          "name":         "opensesame",                  // name has to be set and has to be equal to adapters folder name and main file name excluding extension
- *          "version":      "0.0.0",                    // use "Semantic Versioning"! see http://semver.org/
- *          "title":        "Node.js opensesame Adapter",  // Adapter title shown in User Interfaces
- *          "authors":  [                               // Array of authord
- *              "name <mail@opensesame.com>"
- *          ]
- *          "desc":         "opensesame adapter",          // Adapter description shown in User Interfaces. Can be a language object {de:"...",ru:"..."} or a string
- *          "platform":     "Javascript/Node.js",       // possible values "javascript", "javascript/Node.js" - more coming
- *          "mode":         "daemon",                   // possible values "daemon", "schedule", "subscribe"
- *          "materialize":  true,                       // support of admin3
- *          "schedule":     "0 0 * * *"                 // cron-style schedule. Only needed if mode=schedule
- *          "loglevel":     "info"                      // Adapters Log Level
- *      },
- *      "native": {                                     // the native object is available via adapter.config in your adapters code - use it for configuration
- *          "test1": true,
- *          "test2": 42,
- *          "mySelect": "auto"
- *      }
- *  }
- *
  */
 
-/* jshint -W097 */// jshint strict:false
-/*jslint node: true */
 'use strict';
 
-// you have to require the utils module and call adapter function
-const utils = require("@iobroker/adapter-core");
-const prettyMs = require('pretty-ms');
+const utils = require('@iobroker/adapter-core');
 const path = require('path');
-const express = require('express')
-const app = express()
-const util = require('util');
+const express = require('express');
+const app = express();
+const { normalizeButtons, evaluateConditions, runActions } = require('./lib/buttons');
 
-// you have to call the adapter function and pass a options object
-// name has to be set and has to be equal to adapters folder name and main file name excluding extension
-// adapter will be restarted automatically every time as the configuration changed, e.g system.adapter.opensesame.0
 const adapter = new utils.Adapter('opensesame');
 
-// is called when adapter shuts down - callback has to be called under any circumstances!
+let buttons = [];
+let sseClients = [];
+let server = null;
+// cache of foreign state values, keyed by state id, kept warm via subscriptions
+const stateCache = {};
+
 adapter.on('unload', function (callback) {
     try {
+        sseClients.forEach((res) => res.end());
+        sseClients = [];
+        if (server) {
+            server.close();
+        }
         adapter.log.info('cleaned everything up...');
         callback();
     } catch (e) {
@@ -56,120 +34,157 @@ adapter.on('unload', function (callback) {
     }
 });
 
-// is called when databases are connected and adapter received configuration.
-// start here!
+adapter.on('stateChange', function (id, state) {
+    if (!state) {
+        return;
+    }
+    stateCache[id] = state.val;
+    broadcastEvent('stateChange', { id, val: state.val, ack: state.ack });
+});
+
 adapter.on('ready', function () {
     main();
 });
 
-adapter.on('stateChange', function (id, state) {
-    adapter.log.info('stateChange ' + id + ' ' + JSON.stringify(state));
+function broadcastEvent(event, data) {
+    const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    sseClients.forEach((res) => res.write(payload));
+}
 
-    // you can use the ack flag to detect if state is command(false) or status(true)
-    if (!state.ack) {
-        adapter.log.info('ack is not set!');
+// getState helper used by the condition evaluator and button actions - prefers
+// the live subscription cache, falls back to a direct lookup for states we
+// aren't subscribed to (e.g. referenced only by a script action).
+function getState(id) {
+    if (Object.prototype.hasOwnProperty.call(stateCache, id)) {
+        return Promise.resolve(stateCache[id]);
     }
-});
+    return new Promise((resolve) => {
+        adapter.getForeignState(id, (err, state) => {
+            resolve(err || !state ? undefined : state.val);
+        });
+    });
+}
+
+function setState(id, value) {
+    return new Promise((resolve, reject) => {
+        adapter.setForeignState(id, value, (err) => (err ? reject(err) : resolve()));
+    });
+}
+
+function subscribeButtonStates(list) {
+    const ids = new Set();
+    list.forEach((button) => {
+        if (button.conditions && Array.isArray(button.conditions.items)) {
+            button.conditions.items.forEach((c) => ids.add(c.stateId));
+        }
+        button.actions.forEach((a) => {
+            if (a.type !== 'script' && a.stateId) {
+                ids.add(a.stateId);
+            }
+        });
+    });
+    ids.forEach((id) => {
+        adapter.subscribeForeignStates(id);
+        adapter.getForeignState(id, (err, state) => {
+            if (!err && state) {
+                stateCache[id] = state.val;
+            }
+        });
+    });
+}
 
 function main() {
-
-    // The adapters config (in the instance object everything under the attribute "native") is accessible via
-    // adapter.config:
     adapter.log.info('port of web server: ' + adapter.config.port);
 
-    // in this all states changes inside the adapters namespace are subscribed
-    adapter.subscribeStates('*');
+    buttons = normalizeButtons(adapter.config);
+    subscribeButtonStates(buttons);
 
-    app.use(express.static(path.join(__dirname, 'views')))
-    app.use(express.static(path.join(__dirname, 'css')))
-    app.use(express.static(path.join(__dirname, 'js')))
-
-    const roles = ['switch', 'level.blind', 'indicator.switch', 'indicator.level'];
-    let all_rid = [];
-    let idx = 0;
-    adapter.getForeignObjects('*', 'state', (err, objs) => {
-        adapter.log.debug(Object.keys(objs).length + ' foreign states.');
-        for (let key in objs) {
-            let r = /^[a-zA-Z0-9]+\.[0-9]+/.exec(key);
-            if (r) {
-                if (-1 != roles.indexOf(objs[key].common.role)) {
-                    console.log(key + ' ' + objs[key].name);
-                    adapter.log.debug(key + ' ' + objs[key].name);
-                    let state = objs[key].common;
-                    all_rid.push({ index: idx, updating: false, real_id: key, id: key.replace(/[\.\-]/g, '_'), name: state.name, val: state.val, type: state.type, role: state.role});
-                    idx++;
-                }
-            }
-        }
-    });
-
-    var port = adapter.config.port;
-    let rid = [];
-    for (let i= 0; i < adapter.config.id.length;i++ ) {
-        rid.push({ index: i, updating: false, real_id:  adapter.config.id[i].id, id: adapter.config.id[i].id.replace(/[\.\-]/g, '_'), name: adapter.config.id[i].name, val: false});
-        // add initial state
-        adapter.getForeignObject(adapter.config.id[i].id, function (err, obj) {
-            let state = obj.common;
-            adapter.log.info(util.inspect(state) + ' ' + adapter.config.id[i].id + ' is ' + state.val);
-            rid[i].val = state.val;
-            rid[i].real_name = state.name;
-            rid[i].type = state.type;
-            rid[i].role = state.role;
-
-        });
-        adapter.subscribeForeignStates(adapter.config.id[i].id);
-    }
+    // this is a small, actively-edited LAN tool - correctness after a redeploy
+    // matters far more than caching perf, so never let the browser cache these
+    const staticOpts = { setHeaders: (res) => res.set('Cache-Control', 'no-store') };
+    app.use(express.static(path.join(__dirname, 'views'), staticOpts));
+    app.use(express.static(path.join(__dirname, 'css'), staticOpts));
+    app.use(express.static(path.join(__dirname, 'js'), staticOpts));
+    app.use(express.json());
 
     app.get('/', (req, res) => {
-        res.sendFile(path.join(__dirname + '/views/index.html'));
+        res.sendFile(path.join(__dirname, 'views', 'index.html'));
     });
 
-    app.get('/open', (req, res) => {
-        if ('id' in req.query) {
-            adapter.log.info('open clicked for id = ' + req.query.id);
-            for (let i = 0; i <  adapter.config.id.length; i++) {
-                if (req.query.id == adapter.config.id[i].id.replace(/[\.\-]/g, '_')) {
-                    adapter.setForeignState( adapter.config.id[i].id, true, function(err, id) {
-                        if (err) {
-                            adapter.log.info('err: setForeignState for id = ' + adapter.config.id[i].id);
-                        }
-                        adapter.log.info('setForeignState for id = ' + adapter.config.id[i].id);
-                        rid[i].val = true;
-                        res.setHeader('Content-Type', 'application/json');
-                        res.end(JSON.stringify(rid));
-                    });
-                    break;
-                }
-            }
-        }
-        // res.redirect('/');
+    app.get('/buttons', (req, res) => {
+        res.json(
+            buttons.map((b) => ({
+                id: b.id,
+                name: b.name,
+                icon: b.icon,
+                kind: b.kind,
+                invert: b.invert,
+                confirm: b.confirm,
+                val: b.actions[0] && b.actions[0].type === 'state' ? stateCache[b.actions[0].stateId] : undefined,
+            }))
+        );
     });
 
+    // legacy endpoint kept for compatibility with the old frontend/bookmarks
     app.get('/get', (req, res) => {
-        let l = rid;
-        if ('all' in req.query) {
-            l = all_rid;
-        }
+        res.json(
+            buttons.map((b, i) => ({
+                index: i,
+                id: b.id,
+                name: b.name,
+                val: b.actions[0] && b.actions[0].type === 'state' ? stateCache[b.actions[0].stateId] : undefined,
+            }))
+        );
+    });
 
-        let promises = [];
-        for (let i = 0; i < l.length; i++) {
-            promises[i] = new Promise(function(resolve, reject) {
-                adapter.getForeignObject(l[i].real_id, function (err, obj) {
-                    if (err || !obj) {
-                        reject();
-                        return;
-                    }
-                    let state = obj.common;
-                    l[i].val = state.val;
-                    resolve(l[i]);
-                });
-            });
-        }
-
-        Promise.all(promises).then(function(values) {
-            res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify(values));
+    app.get('/events', (req, res) => {
+        res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            Connection: 'keep-alive',
+        });
+        res.write('\n');
+        sseClients.push(res);
+        req.on('close', () => {
+            sseClients = sseClients.filter((c) => c !== res);
         });
     });
-    app.listen(port, () => adapter.log.info(`listening on port ${port}!`));
+
+    app.post('/press/:id', async (req, res) => {
+        const button = buttons.find((b) => b.id === req.params.id);
+        if (!button) {
+            res.status(404).json({ error: 'unknown button' });
+            return;
+        }
+
+        const ctx = { getState, setState, log: adapter.log };
+        try {
+            const allowed = await evaluateConditions(button.conditions, getState);
+            if (!allowed) {
+                adapter.log.info(`button ${button.id} blocked by conditions`);
+                res.json({ ok: false, blocked: true });
+                return;
+            }
+            await runActions(button.actions, ctx);
+            res.json({ ok: true });
+        } catch (e) {
+            adapter.log.error(`button ${button.id} failed: ${e.message}`);
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    // legacy endpoint kept for compatibility with the old frontend/bookmarks
+    app.get('/open', (req, res) => {
+        const id = req.query.id;
+        const button = buttons.find((b) => b.id === id);
+        if (!button) {
+            res.status(404).end();
+            return;
+        }
+        runActions(button.actions, { getState, setState, log: adapter.log })
+            .then(() => res.json({ ok: true }))
+            .catch((e) => res.status(500).json({ ok: false, error: e.message }));
+    });
+
+    server = app.listen(adapter.config.port, () => adapter.log.info(`listening on port ${adapter.config.port}!`));
 }
