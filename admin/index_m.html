@@ -5,9 +5,6 @@
 <link rel="stylesheet" type="text/css" href="../../css/adapter.css"/>
 
 <script type="text/javascript" src="../../lib/js/jquery-3.2.1.min.js"></script>
-<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"
-  integrity="sha256-VazP97ZCwtekAsvgPBSUwPFKdrwD3unUfSGVYrahUqU="
-  crossorigin="anonymous"></script>
 <script type="text/javascript" src="../../socket.io/socket.io.js"></script>
 
 <!-- these files always have to be included -->
@@ -15,116 +12,374 @@
 <script type="text/javascript" src="../../lib/js/materialize.js"></script>
 <script type="text/javascript" src="../../js/adapter-settings.js"></script>
 <script type="text/javascript" src="words.js"></script>
- <style>
-  .m .col .select-wrapper+label {
-   top: -26px;  
-  }
-    .m span{
-        font-size: 0.9em;
-    }
-    img {
-        width: 90px;
-        height: 90px;
-        background: 50% no-repeat;
-        border: 1px solid black;
-        border-radius: 5px;
-    } 
-    input[id^='id'] {
-        color: blue;
-        background-color: #E8E8E8!important;
-    }
-    input[id^='name_id'] {
-        color: blue;
-        background-color: #E8E8E8!important;
-    }
-    </style>
-<!-- you have to define 2 functions in the global scope: -->
+<link rel="stylesheet" type="text/css" href="style.css">
+
 <script type="text/javascript">
-    // the function loadSettings has to exist ...
-    function load(settings, onChange) {
-        // example: select elements with id=key and class=value and insert value
-        if (!settings) return;
+    const ICONS = ['default', 'door', 'light', 'lock', 'garage', 'fan'];
+    const OPERATORS = ['==', '!=', '>', '<', '>=', '<='];
 
-        var t = $('#value_table');
-        $.each(settings.id, function(i, v) {
-            let $key = $(this);
-            let row = $('<tr><td class="translate">ID' + i + '<button id="button_id' + i + '">DEL</button></td><td><input class="value" id="id' + i + '"/></td><td><input class="name_value" id="name_id' + i + '"/></td></tr>').appendTo(t);
-            $('#id' + i).val(v.id);
-            $('#name_id' + i).val(v.name);
-            $('#id' + i).on('change', function() {
-                onChange();
-            }).on('keyup', function() {
-                onChange();
-            });
-            $('#name_id' + i).on('change', function() {
-                onChange();
-            }).on('keyup', function() {
-                onChange();
-            });
-            $('#button_id' + i).click(function() {
-                row.remove();
-                $('.value').each(function (i) {
-                    $(this).attr("id","id" + i);
-                    let e = $(this).parent().prev();
-                    e.text('ID' + i);
-                });
-                onChange();
-            });
-        });
-        $('#port').val(settings.port);
-        $('#add').click(function() {
-            let i = $('.value').length;
-            let row = $('<tr><td class="translate">ID' + i + '<button id="button_id' + i + '">DEL</button></td><td><input class="value" id="id' + i + '"/></td><td><input class="name_value" id="name_id' + i + '"/></td></tr>').appendTo(t);
-            $('#button_id' + i).click(function() {
-                row.remove();
-                onChange();
-            });
-            onChange();
-        });
-        onChange(false);
-        M.updateTextFields();  // function Materialize.updateTextFields(); to reinitialize all the Materialize labels on the page if you are dynamically adding inputs.
+    // in-memory editor model, built from settings on load()
+    let model = { port: '8099', buttons: [] };
+    let notifyChange = function () {};
+
+    function uid() {
+        return 'b_' + Math.random().toString(36).slice(2, 9);
     }
 
-    // ... and the function save has to exist.
-    // you have to make sure the callback is called with the settings object as first param!
+    // Accepts the flexible legacy `id: [{id, name}]` shape and normalizes it
+    // into today's `buttons` shape, purely for editing - matches the runtime
+    // fallback in lib/buttons.js so what you see here is what would run even
+    // before the first save.
+    function migrateLegacy(settings) {
+        if (Array.isArray(settings.buttons) && settings.buttons.length) {
+            return settings.buttons.map((b) => ({
+                uiKey: uid(),
+                id: b.id,
+                name: b.name || '',
+                icon: b.icon || 'default',
+                kind: b.kind === 'toggle' ? 'toggle' : 'momentary',
+                invert: !!b.invert,
+                confirm: !!b.confirm,
+                conditions: b.conditions || { mode: 'AND', items: [] },
+                actions: (b.actions || []).map((a) => ({ uiKey: uid(), ...a })),
+            }));
+        }
+        return (settings.id || []).map((entry) => ({
+            uiKey: uid(),
+            id: entry.id.replace(/[.-]/g, '_'),
+            name: entry.name || '',
+            icon: 'default',
+            kind: 'momentary',
+            invert: false,
+            confirm: false,
+            conditions: { mode: 'AND', items: [] },
+            actions: [{ uiKey: uid(), type: 'state', stateId: entry.id, value: true, delay: 0 }],
+        }));
+    }
+
+    function parseValue(raw) {
+        if (raw === 'toggle') return 'toggle';
+        if (raw === 'true') return true;
+        if (raw === 'false') return false;
+        if (raw !== '' && !isNaN(Number(raw))) return Number(raw);
+        return raw;
+    }
+
+    function valueToText(v) {
+        return v === undefined ? '' : String(v);
+    }
+
+    const ICON_SVG = {
+        default: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg>',
+        door: '<svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1"/><circle cx="15" cy="12" r="1"/></svg>',
+        light: '<svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3 11.2c.4.3.6.8.6 1.3v.5h4.8v-.5c0-.5.2-1 .6-1.3A6 6 0 0 0 12 3z"/></svg>',
+        lock: '<svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+        garage: '<svg viewBox="0 0 24 24"><path d="M3 21V9l9-6 9 6v12"/><path d="M3 12h18M7 21v-6h10v6"/></svg>',
+        fan: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1.5"/><path d="M12 12c0-4 2-7 5-7s2 5-1 7c3 0 6 2 6 5s-4 2-6-1c0 4-2 7-5 7s-2-5 1-7c-3 0-6-2-6-5s4-2 6 1z"/></svg>',
+    };
+    const CROSS_SVG = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    const TRASH_SVG = '<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
+
+    // state id autocomplete: fetched once, then filtered client-side as a
+    // regex (falls back to a plain substring match if the typed text isn't
+    // valid regex) - e.g. typing "javascript\." lists every javascript.* state.
+    let allStates = null;
+    function loadAllStates(cb) {
+        if (allStates) { cb(allStates); return; }
+        socket.emit('getObjects', function (err, res) {
+            allStates = [];
+            if (!err && res) {
+                for (var id in res) {
+                    if (res[id] && res[id].type === 'state') {
+                        var name = res[id].common && res[id].common.name;
+                        if (name && typeof name === 'object') name = name.en || Object.values(name)[0] || '';
+                        allStates.push({ id: id, name: name || '' });
+                    }
+                }
+                allStates.sort(function (a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; });
+            }
+            cb(allStates);
+        });
+    }
+
+    function matchStates(query) {
+        if (!allStates) return [];
+        if (!query) return allStates.slice(0, 30);
+        var re = null;
+        try { re = new RegExp(query, 'i'); } catch (e) { /* fall back to substring below */ }
+        var q = query.toLowerCase();
+        return allStates.filter((s) => (re ? re.test(s.id) : s.id.toLowerCase().indexOf(q) !== -1)).slice(0, 30);
+    }
+
+    function closeSuggest() {
+        $('.state-suggest').remove();
+    }
+
+    function showSuggest($input) {
+        closeSuggest();
+        const matches = matchStates($input.val().trim());
+        const $box = $('<div class="state-suggest"></div>');
+        if (!matches.length) {
+            $box.append('<div class="state-suggest-empty">no matching states</div>');
+        } else {
+            matches.forEach((s) => {
+                const $item = $('<div class="state-suggest-item"><span class="sid"></span><span class="sname"></span></div>');
+                $item.find('.sid').text(s.id);
+                $item.find('.sname').text(s.name);
+                $item.on('mousedown', (e) => {
+                    e.preventDefault();
+                    $input.val(s.id).trigger('input');
+                    closeSuggest();
+                });
+                $box.append($item);
+            });
+        }
+        $input.closest('.field-row').append($box);
+    }
+
+    $(document).on('mousedown', (e) => {
+        if (!$(e.target).closest('.field-row').length) closeSuggest();
+    });
+
+    function iconOptions(selected) {
+        return ICONS.map((i) => `<option value="${i}" ${i === selected ? 'selected' : ''}>${i}</option>`).join('');
+    }
+
+    function operatorOptions(selected) {
+        return OPERATORS.map((o) => `<option value="${o}" ${o === selected ? 'selected' : ''}>${o}</option>`).join('');
+    }
+
+    function renderAction(btn, action) {
+        const isScript = action.type === 'script';
+        if (isScript) {
+            return `
+            <div class="field-row script-row action-row" data-key="${action.uiKey}">
+                <select class="action-type browser-default">
+                    <option value="state">set state</option>
+                    <option value="script" selected>run script</option>
+                </select>
+                <span class="tag script">script</span>
+                <textarea class="action-code browser-default" placeholder="await setState('id', true)">${action.code || ''}</textarea>
+                <button class="icon-btn remove-action" title="remove">${CROSS_SVG}</button>
+            </div>`;
+        }
+        const isToggle = action.value === 'toggle';
+        return `
+        <div class="field-row action-row" data-key="${action.uiKey}">
+            <select class="action-type browser-default">
+                <option value="state" selected>set state</option>
+                <option value="script">run script</option>
+            </select>
+            <span class="tag state">state</span>
+            <input class="action-stateid state-id browser-default" placeholder="state id or /regex/" value="${action.stateId || ''}" autocomplete="off"/>
+            <span class="op">=</span>
+            <input class="action-value val browser-default" placeholder="value" value="${isToggle ? '' : valueToText(action.value)}" ${isToggle ? 'disabled' : ''}/>
+            <label class="toggle-check"><input type="checkbox" class="action-is-toggle" ${isToggle ? 'checked' : ''}/> flip current value</label>
+            <input class="action-delay delay browser-default" type="number" min="0" placeholder="ms" value="${action.delay || 0}"/>
+            <button class="icon-btn remove-action" title="remove">${CROSS_SVG}</button>
+        </div>`;
+    }
+
+    function renderCondition(btn, item) {
+        return `
+        <div class="field-row condition-row" data-key="${item.uiKey}">
+            <input class="cond-stateid state-id browser-default" placeholder="state id or /regex/" value="${item.stateId || ''}" autocomplete="off"/>
+            <select class="cond-op op-select browser-default">${operatorOptions(item.op || '==')}</select>
+            <input class="cond-value val browser-default" placeholder="value" value="${valueToText(item.value)}"/>
+            <button class="icon-btn remove-condition" title="remove">${CROSS_SVG}</button>
+        </div>`;
+    }
+
+    function renderButton(btn) {
+        const items = btn.conditions.items || [];
+        return `
+        <div class="os-card" data-key="${btn.uiKey}">
+            <div class="os-card-head">
+                <span class="icon-chip">${ICON_SVG[btn.icon] || ICON_SVG.default}</span>
+                <div class="name-field">
+                    <input class="btn-name browser-default" placeholder="name" value="${btn.name}"/>
+                    <div class="id-hint">${items.length ? items.length + ' condition' + (items.length > 1 ? 's' : '') + ' · ' : ''}${btn.actions.length} action${btn.actions.length === 1 ? '' : 's'}</div>
+                </div>
+                <div class="head-controls">
+                    <select class="btn-icon icon-select browser-default">${iconOptions(btn.icon)}</select>
+                    <select class="btn-kind icon-select browser-default" title="momentary: press-and-run (doors, garage). toggle: tile shows on/off state (lights, fans)">
+                        <option value="momentary" ${btn.kind !== 'toggle' ? 'selected' : ''}>momentary</option>
+                        <option value="toggle" ${btn.kind === 'toggle' ? 'selected' : ''}>toggle</option>
+                    </select>
+                    <label class="os-switch ${btn.invert ? 'on' : ''}" style="display:${btn.kind === 'toggle' ? 'inline-flex' : 'none'}" title="check if the state is active-low (0/false means on)">
+                        <input type="checkbox" class="btn-invert" ${btn.invert ? 'checked' : ''}/>
+                        <span class="track"></span>0=on
+                    </label>
+                    <label class="os-switch ${btn.confirm ? 'on' : ''}">
+                        <input type="checkbox" class="btn-confirm" ${btn.confirm ? 'checked' : ''}/>
+                        <span class="track"></span>confirm
+                    </label>
+                    <button class="icon-btn remove-button" title="delete button">${TRASH_SVG}</button>
+                </div>
+            </div>
+
+            <div class="os-card-body">
+                <div class="section-label">Conditions
+                    <select class="cond-mode mode-select browser-default">
+                        <option value="AND" ${btn.conditions.mode !== 'OR' ? 'selected' : ''}>AND</option>
+                        <option value="OR" ${btn.conditions.mode === 'OR' ? 'selected' : ''}>OR</option>
+                    </select>
+                    must be true for actions to run
+                </div>
+                <div class="well condition-list">${items.map((i) => renderCondition(btn, i)).join('')}</div>
+                <button class="add-row add-condition">+ condition</button>
+
+                <div class="section-label">Actions <span style="text-transform:none;font-weight:400">— run in order on click</span></div>
+                <div class="well action-list">${btn.actions.map((a) => renderAction(btn, a)).join('')}</div>
+                <button class="add-row add-action">+ action</button>
+            </div>
+        </div>`;
+    }
+
+    function render() {
+        $('#buttons').html(model.buttons.map(renderButton).join('') || '<p class="empty">No buttons yet. Add one below.</p>');
+        bindEvents();
+    }
+
+    function findButton(uiKey) {
+        return model.buttons.find((b) => b.uiKey === uiKey);
+    }
+
+    function bindEvents() {
+        $('.state-id').each(function () {
+            const $input = $(this);
+            $input.on('focus', () => loadAllStates(() => showSuggest($input)));
+            $input.on('input', () => loadAllStates(() => showSuggest($input)));
+        });
+
+        $('.os-card').each(function () {
+            const uiKey = $(this).data('key');
+            const btn = findButton(uiKey);
+
+            $(this).find('.btn-name').on('input', function () { btn.name = $(this).val(); notifyChange(); });
+            $(this).find('.btn-icon').on('change', function () { btn.icon = $(this).val(); render(); notifyChange(); });
+            $(this).find('.btn-kind').on('change', function () {
+                btn.kind = $(this).val();
+                if (btn.kind === 'toggle') {
+                    // toggle buttons are pointless if their state action doesn't flip - default new ones to it
+                    btn.actions.forEach((a) => { if (a.type === 'state' && !a.stateId && a.value !== 'toggle') a.value = 'toggle'; });
+                }
+                render(); notifyChange();
+            });
+            $(this).find('.btn-invert').on('change', function () {
+                btn.invert = $(this).is(':checked');
+                $(this).closest('.os-switch').toggleClass('on', btn.invert);
+                notifyChange();
+            });
+            $(this).find('.btn-confirm').on('change', function () {
+                btn.confirm = $(this).is(':checked');
+                $(this).closest('.os-switch').toggleClass('on', btn.confirm);
+                notifyChange();
+            });
+            $(this).find('.remove-button').on('click', function () {
+                model.buttons = model.buttons.filter((b) => b.uiKey !== uiKey);
+                render(); notifyChange();
+            });
+            $(this).find('.cond-mode').on('change', function () { btn.conditions.mode = $(this).val(); notifyChange(); });
+            $(this).find('.add-condition').on('click', function () {
+                btn.conditions.items.push({ uiKey: uid(), stateId: '', op: '==', value: '' });
+                render(); notifyChange();
+            });
+            $(this).find('.add-action').on('click', function () {
+                btn.actions.push({ uiKey: uid(), type: 'state', stateId: '', value: true, delay: 0 });
+                render(); notifyChange();
+            });
+
+            $(this).find('.condition-row').each(function () {
+                const key = $(this).data('key');
+                const item = btn.conditions.items.find((c) => c.uiKey === key);
+                $(this).find('.cond-stateid').on('input', function () { item.stateId = $(this).val(); notifyChange(); });
+                $(this).find('.cond-op').on('change', function () { item.op = $(this).val(); notifyChange(); });
+                $(this).find('.cond-value').on('input', function () { item.value = parseValue($(this).val()); notifyChange(); });
+                $(this).find('.remove-condition').on('click', function () {
+                    btn.conditions.items = btn.conditions.items.filter((c) => c.uiKey !== key);
+                    render(); notifyChange();
+                });
+            });
+
+            $(this).find('.action-row').each(function () {
+                const key = $(this).data('key');
+                const action = btn.actions.find((a) => a.uiKey === key);
+                $(this).find('.action-type').on('change', function () {
+                    action.type = $(this).val();
+                    render(); notifyChange();
+                });
+                $(this).find('.action-stateid').on('input', function () { action.stateId = $(this).val(); notifyChange(); });
+                $(this).find('.action-value').on('input', function () { action.value = parseValue($(this).val()); notifyChange(); });
+                $(this).find('.action-is-toggle').on('change', function () {
+                    action.value = $(this).is(':checked') ? 'toggle' : true;
+                    render(); notifyChange();
+                });
+                $(this).find('.action-delay').on('input', function () { action.delay = Number($(this).val()) || 0; notifyChange(); });
+                $(this).find('.action-code').on('input', function () { action.code = $(this).val(); notifyChange(); });
+                $(this).find('.remove-action').on('click', function () {
+                    btn.actions = btn.actions.filter((a) => a.uiKey !== key);
+                    render(); notifyChange();
+                });
+            });
+        });
+    }
+
+    function load(settings, onChange) {
+        if (!settings) return;
+        notifyChange = onChange;
+        model = { port: settings.port || '8099', buttons: migrateLegacy(settings) };
+        $('#port').val(model.port);
+        $('#port').on('input', function () { model.port = $(this).val(); onChange(); });
+        $('#add-button').off('click').on('click', function () {
+            model.buttons.push({
+                uiKey: uid(), id: uid(), name: 'New button', icon: 'default', kind: 'momentary', confirm: false,
+                conditions: { mode: 'AND', items: [] },
+                actions: [{ uiKey: uid(), type: 'state', stateId: '', value: true, delay: 0 }],
+            });
+            render(); onChange();
+        });
+        render();
+        onChange(false);
+        M.updateTextFields();
+    }
+
     function save(callback) {
-        // example: select elements with class=value and build settings object
-        var obj = {};
-        obj.port = $('#port').val();
-        obj.id = [];
-        $('.value').each(function(i, v) {
-            obj.id[i] = {}
-            obj.id[i].id = $(v).val();
-        });
-        $('.name_value').each(function(i, v) {
-            obj.id[i].name = $(v).val();
-        });
+        const obj = {
+            port: model.port,
+            buttons: model.buttons.map((b) => ({
+                id: b.id,
+                name: b.name,
+                icon: b.icon,
+                kind: b.kind,
+                invert: b.invert,
+                confirm: b.confirm,
+                conditions: { mode: b.conditions.mode, items: b.conditions.items.map((i) => ({ stateId: i.stateId, op: i.op, value: i.value })) },
+                actions: b.actions.map((a) => a.type === 'script'
+                    ? { type: 'script', code: a.code || '' }
+                    : { type: 'state', stateId: a.stateId, value: a.value, delay: a.delay || 0 }),
+            })),
+        };
         callback(obj);
-        window.location.reload();
     }
 </script>
 </head>
 <body>
-    <!-- you have to put your config page in a div with id adapter-container -->
-    <div class="m adapter-container">
-        <div class="row">
-            <!-- Forms are the standard way to receive user inputted data.
-         Learn more http://materializecss.com/forms.html-->
-            <div class="row">
-                <div class="input-field col s6">
-                    <img src="opensesame.png" class="logo">
-                </div>
-            </div>
-            <div class="row">
-                <p class="translate">PORT</p><input class="pvalue" id="port"/></br>
-            </div>
-            <div class="row">
-                <button id="add">ADD</button>
-                <table id='value_table'>
-                </table>
-            </div>
+    <div class="adapter-container">
+        <div class="page-head">
+            <div class="eyebrow">opensesame · instance settings</div>
+            <h1>Buttons</h1>
+            <p>Each button can gate on other states, fire multiple actions in order, or run a small script.</p>
         </div>
+
+        <div class="port-row">
+            <label for="port">Web server port</label>
+            <input id="port" class="browser-default"/>
+        </div>
+
+        <div id="buttons" class="button-list"></div>
+
+        <button id="add-button" class="add-button">+ add button</button>
     </div>
 </body>
-
 </html>

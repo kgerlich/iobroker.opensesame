@@ -34,9 +34,7 @@
     }
   ],
   "dependencies": {
-    "express": "^4.16.4",
-    "pretty-ms": "^4.0.0",
-    "vue-simple-spinner": "^1.2.8"
+    "express": "^4.16.4"
   },
   "deprecated": false,
   "description": "Adapter for opensesame",
@@ -62,5 +60,5 @@
   "scripts": {
     "test": "node node_modules/mocha/bin/mocha --exit"
   },
-  "version": "0.0.1"
+  "version": "0.1.0"
 }

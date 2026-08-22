@@ -1,0 +1,11 @@
+{
+    "name": "opensesame",
+    "short_name": "opensesame",
+    "display": "standalone",
+    "start_url": "/",
+    "background_color": "#14161c",
+    "theme_color": "#1b6ef3",
+    "icons": [
+        { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ]
+}

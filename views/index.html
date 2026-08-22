@@ -1,102 +1,140 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <title>
-            Index
-        </title>
-        <link rel="stylesheet" type="text/css" href="index.css">
-        <script src="jquery-3.3.1.min.js"></script>
-        <script src="vue.js"></script>        
-        <script src="vue-simple-spinner.min.js"></script>        
-    </head>
-    <body>
-        <div id="buttons">
-            <div>
-                <open-sesame-button v-for="r in rid" v-bind:show_info="show_info" v-bind:device="r" :key="r.id"></open-sesame-button>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>opensesame</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <meta name="theme-color" content="#1b6ef3">
+    <link rel="stylesheet" href="index.css">
+    <script>
+        document.documentElement.dataset.theme = localStorage.getItem('opensesame-theme')
+            || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    </script>
+    <script src="vue.global.prod.js"></script>
+</head>
+<body>
+    <div id="app">
+        <header class="topbar">
+            <h1>opensesame</h1>
+            <div class="topbar-actions">
+                <span class="conn-dot" :class="{ live: connected }" :title="connected ? 'live' : 'reconnecting…'"></span>
+                <button class="icon-btn" @click="toggleTheme" :title="'switch to ' + (theme === 'dark' ? 'light' : 'dark') + ' mode'">
+                    <svg v-if="theme === 'dark'" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg>
+                    <svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+                </button>
             </div>
-            <div class="horzLine">
-            </div>
-            <div>
-                <input class="lg_checkbox" type="checkbox" id="checkbox" v-model="all">
-                <label for="checkbox">{{ all ? "show only selected states" : "show all states" }}</label>
-            </div>
-            <div>
-                <input class="lg_checkbox" type="checkbox" id="checkbox_info" v-model="show_info">
-                <label for="checkbox">{{ "show extra information" }}</label>
+        </header>
+
+        <main class="grid" v-if="buttons.length">
+            <button
+                v-for="b in buttons"
+                :key="b.id"
+                class="tile"
+                :class="{ busy: b.updating, blocked: b.blocked, toggle: b.kind === 'toggle', on: b.kind === 'toggle' && (b.invert ? !b.val : !!b.val) }"
+                :disabled="b.updating"
+                @click="onPress(b)"
+            >
+                <span class="tile-icon" v-html="icon(b.icon)"></span>
+                <span class="tile-name">{{ b.name }}</span>
+                <span class="tile-spinner" v-if="b.updating"></span>
+                <span class="tile-blocked" v-if="b.blocked">blocked</span>
+            </button>
+        </main>
+        <p class="empty" v-else>No buttons configured yet. Add some in the adapter settings.</p>
+
+        <div class="confirm-overlay" v-if="pendingConfirm" @click.self="pendingConfirm = null">
+            <div class="confirm-box">
+                <p>Trigger "{{ pendingConfirm.name }}"?</p>
+                <div class="confirm-actions">
+                    <button class="confirm-cancel" @click="pendingConfirm = null">Cancel</button>
+                    <button class="confirm-ok" @click="confirmPress">Confirm</button>
+                </div>
             </div>
         </div>
-    </body>
+    </div>
+
     <script>
-        // Define a new component called button-counter
-        Vue.component('open-sesame-button', {
-            props: ['device', 'show_info'],
+        const ICONS = {
+            door: '<svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1"/><circle cx="15" cy="12" r="1"/></svg>',
+            light: '<svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3 11.2c.4.3.6.8.6 1.3v.5h4.8v-.5c0-.5.2-1 .6-1.3A6 6 0 0 0 12 3z"/></svg>',
+            lock: '<svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+            garage: '<svg viewBox="0 0 24 24"><path d="M3 21V9l9-6 9 6v12"/><path d="M3 12h18M7 21v-6h10v6"/></svg>',
+            fan: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1.5"/><path d="M12 12c0-4 2-7 5-7s2 5-1 7c3 0 6 2 6 5s-4 2-6-1c0 4-2 7-5 7s-2-5 1-7c-3 0-6-2-6-5s4-2 6 1z"/></svg>',
+            default: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg>',
+        };
+
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    buttons: [],
+                    connected: false,
+                    pendingConfirm: null,
+                    theme: localStorage.getItem('opensesame-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
+                };
+            },
+            mounted() {
+                document.documentElement.dataset.theme = this.theme;
+                this.loadButtons();
+                this.connectEvents();
+            },
             methods: {
-                clicked_button: function(event) {
-                    this.device.updating = true;
-                    let targetId = event.currentTarget.id;
-                    $( "#" + targetId).animate({
-                        opacity: 0.1
-                    }, 250, function() {
-                        // Animation complete.
-                        $.get( "/open",  { id: targetId } , function( data ) {
-                            $( "#" + targetId).animate({
-                                opacity: 1.0
-                            }, 100);
-                        });
+                icon(name) {
+                    return ICONS[name] || ICONS.default;
+                },
+                toggleTheme() {
+                    this.theme = this.theme === 'dark' ? 'light' : 'dark';
+                    document.documentElement.dataset.theme = this.theme;
+                    localStorage.setItem('opensesame-theme', this.theme);
+                },
+                async loadButtons() {
+                    const res = await fetch('/buttons');
+                    const data = await res.json();
+                    this.buttons = data.map((b) => ({ ...b, updating: false, blocked: false }));
+                },
+                connectEvents() {
+                    const es = new EventSource('/events');
+                    es.onopen = () => { this.connected = true; };
+                    es.onerror = () => { this.connected = false; };
+                    es.addEventListener('stateChange', () => {
+                        // any subscribed state changed - refresh the button list's displayed values
+                        this.loadButtons();
                     });
                 },
-                isNumber: function() {
-                    return this.device.type === 'number';
-                }
-            },
-            template: '<button :id="device.id" @click="clicked_button($event)">          \
-                        <vue-simple-spinner v-if="device.updating"></vue-simple-spinner> \
-                        <p v-if="device.name" class="lg_text">{{ device.name }}</p>      \
-                        <p v-if="!device.name"class="lg_text">OPEN {{device.index}}</p>  \
-                        <p v-if="!device.name" class="sm_text">{{ device.id }}</p>       \
-                        <div v-if="show_info">                                           \
-                            <p class="sm_text" v-if="isNumber()" >number {{ device.val }}</p>      \
-                            <p class="sm_text" v-else>bool {{ device.val ? "true" : "false" }}</p> \
-                            <p v-if="device.name" class="sm_text">{{ device.id }}</p>        \
-                        </div>                                                           \
-                    </button>',
-        });
-
-        // retrieve data from server
-        function get_data() {
-            options = {}
-            if (app.all) {
-                options = { all: 1 };
-            }
-            $.get(
-                "/get",
-                options,
-                function(data) {
-                    app.rid = data;
-                    setTimeout(get_data, 5*1000);
-                }
-            );
-        }
-        
-        let app = new Vue({
-            el: '#buttons',
-            data: {
-                rid: [],
-                all: false,
-                show_info: false
-            },
-            watch: {
-                all: function(old_value, new_value) {
-                    get_data();
+                onPress(button) {
+                    if (button.updating) return;
+                    if (button.confirm) {
+                        this.pendingConfirm = button;
+                        return;
+                    }
+                    this.press(button);
                 },
-                show_info: function(old_value, new_value) {
-                    get_data();
-                }
-            }
-        })
-
-        $( document ).ready(function() {
-            get_data();
-        });  
+                confirmPress() {
+                    const button = this.pendingConfirm;
+                    this.pendingConfirm = null;
+                    this.press(button);
+                },
+                async press(button) {
+                    button.updating = true;
+                    button.blocked = false;
+                    try {
+                        const res = await fetch('/press/' + encodeURIComponent(button.id), { method: 'POST' });
+                        const data = await res.json();
+                        if (data.blocked) {
+                            button.blocked = true;
+                            setTimeout(() => { button.blocked = false; }, 2000);
+                        }
+                    } catch (e) {
+                        // network hiccup - state will resync on next SSE event / reconnect
+                    } finally {
+                        button.updating = false;
+                    }
+                },
+            },
+        }).mount('#app');
     </script>
+</body>
 </html>
